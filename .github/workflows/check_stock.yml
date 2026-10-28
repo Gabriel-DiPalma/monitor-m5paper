@@ -2,9 +2,10 @@ name: Monitorar Estoque M5Paper (Telegram)
 
 on:
   schedule:
-    # Executa a cada hora no minuto 0 (ex: 13:00, 14:00...)
+    # Executa a cada hora
     - cron: '0 * * * *'
-  # Permite rodar manualmente a qualquer momento
+
+  # Permite executar manualmente
   workflow_dispatch:
 
 jobs:
@@ -12,71 +13,122 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout do repositório
-        uses: actions/checkout@v4
-
       - name: Configurar Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
-      - name: Instalar bibliotecas
+      - name: Instalar dependencias
         run: pip install requests
 
       - name: Verificar estoque e notificar via Telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
         run: |
           python - << 'EOF'
-          import requests
           import os
+          import requests
 
-          # URL da API do produto no Shopify da M5Stack
-          url = "https://shop.m5stack.com/products/m5papermono-with-lora-nfc-800x480-3-97-eink-display.js"
-          variant_id = 9316360159489
+          PRODUCT_URL = "https://shop.m5stack.com/products/m5papermono-with-lora-nfc-800x480-3-97-eink-display"
+          API_URL = PRODUCT_URL + ".js"
+
+          VARIANT_ID = 50199717249281
 
           bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
           chat_id = os.environ.get("TELEGRAM_CHAT_ID")
 
           headers = {
-              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+              "User-Agent": (
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                  "AppleWebKit/537.36 Chrome/130 Safari/537.36"
+              )
           }
 
           try:
-              response = requests.get(url, headers=headers)
-              data = response.json()
-              
-              available = False
-              title = data.get("title", "M5Paper Mono")
+              print("Consultando M5Stack...")
 
-              # Procura a variante do produto
+              response = requests.get(
+                  API_URL,
+                  headers=headers,
+                  timeout=20
+              )
+
+              response.raise_for_status()
+
+              data = response.json()
+
+              print(f"Produto: {data.get('title')}")
+              print(f"Variantes encontradas: {len(data.get('variants', []))}")
+
+              target_variant = None
+
               for variant in data.get("variants", []):
-                  if variant.get("id") == variant_id:
-                      available = variant.get("available", False)
-                      price = variant.get("price", 0) / 100
+                  print(
+                      f"Variant ID: {variant.get('id')} | "
+                      f"Available: {variant.get('available')}"
+                  )
+
+                  if int(variant.get("id")) == VARIANT_ID:
+                      target_variant = variant
                       break
 
-              if available:
-                  print("✅ PRODUTO EM ESTOQUE!")
-                  msg = (
-                      f"🚨 *PRODUTO DISPONÍVEL!* 🚨\n\n"
-                      f"O *{title}* está em estoque por *${price:.2f}*!\n\n"
-                      f"🔗 [Clique aqui para comprar](shop.m5stack.com/products/m5papermono-with-lora-nfc-800x480-3-97-eink-display?variant={variant_id})"
+              if target_variant is None:
+                  raise RuntimeError(
+                      f"Variant {VARIANT_ID} nao encontrada no produto."
                   )
-                  
-                  if bot_token and chat_id:
-                      telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-                      payload = {
-                          "chat_id": chat_id,
-                          "text": msg,
-                          "parse_mode": "Markdown",
-                          "disable_web_page_preview": False
-                      }
-                      requests.post(telegram_url, json=payload)
-              else:
+
+              available = target_variant.get("available", False)
+
+              price_raw = target_variant.get("price", 0)
+
+              try:
+                  price = float(price_raw) / 100
+              except (TypeError, ValueError):
+                  price = 0
+
+              if not available:
                   print("❌ Produto continua fora de estoque.")
+                  raise SystemExit(0)
+
+              print("✅ PRODUTO EM ESTOQUE!")
+
+              title = data.get("title", "M5PaperMono")
+
+              purchase_url = f"{PRODUCT_URL}?variant={VARIANT_ID}"
+
+              msg = (
+                  "🚨 *PRODUTO DISPONÍVEL!* 🚨\n\n"
+                  f"O *{title}* está em estoque por *${price:.2f}*!\n\n"
+                  f"🔗 [Clique aqui para comprar]({purchase_url})"
+              )
+
+              if not bot_token or not chat_id:
+                  raise RuntimeError(
+                      "TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID não configurado."
+                  )
+
+              telegram_url = (
+                  f"https://api.telegram.org/bot{bot_token}/sendMessage"
+              )
+
+              telegram_response = requests.post(
+                  telegram_url,
+                  json={
+                      "chat_id": chat_id,
+                      "text": msg,
+                      "parse_mode": "Markdown",
+                      "disable_web_page_preview": False
+                  },
+                  timeout=20
+              )
+
+              telegram_response.raise_for_status()
+
+              print("📨 Notificação enviada para o Telegram.")
 
           except Exception as e:
-              print(f"Erro ao verificar: {e}")
+              print(f"❌ ERRO: {e}")
+              raise
           EOF
