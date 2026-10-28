@@ -34,7 +34,7 @@ jobs:
 
           # URL da API do produto no Shopify da M5Stack
           url = "https://shop.m5stack.com/products/m5papermono-with-lora-nfc-800x480-3-97-eink-display.js"
-          variant_id = 39966887903404
+          variant_id = 9316360159489
 
           bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
           chat_id = os.environ.get("TELEGRAM_CHAT_ID")
