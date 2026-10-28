@@ -33,7 +33,7 @@ jobs:
           import os
 
           # URL da API do produto no Shopify da M5Stack
-          url = "https://shop.m5stack.com/products/m5paper-esp32-development-kit-v1-1-960x540-4-7-eink-display-235-ppi.js"
+          url = "https://shop.m5stack.com/products/m5papermono-with-lora-nfc-800x480-3-97-eink-display.js"
           variant_id = 39966887903404
 
           bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -48,7 +48,7 @@ jobs:
               data = response.json()
               
               available = False
-              title = data.get("title", "M5Paper ESP32")
+              title = data.get("title", "M5Paper Mono")
 
               # Procura a variante do produto
               for variant in data.get("variants", []):
@@ -62,7 +62,7 @@ jobs:
                   msg = (
                       f"🚨 *PRODUTO DISPONÍVEL!* 🚨\n\n"
                       f"O *{title}* está em estoque por *${price:.2f}*!\n\n"
-                      f"🔗 [Clique aqui para comprar](https://shop.m5stack.com/products/m5paper-esp32-development-kit-v1-1-960x540-4-7-eink-display-235-ppi?variant={variant_id})"
+                      f"🔗 [Clique aqui para comprar](shop.m5stack.com/products/m5papermono-with-lora-nfc-800x480-3-97-eink-display?variant={variant_id})"
                   )
                   
                   if bot_token and chat_id:
